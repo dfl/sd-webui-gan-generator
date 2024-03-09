@@ -107,12 +107,13 @@ class Model:
         print(f"Generating GAN image with {{ seed: {seed}, psi: {truncation_psi} }}")
         return self.generate_image(seed, truncation_psi), outputSeedStr
         
-    def set_model_and_generate_styles(self, device: str, model_name: str, seed1: int, seed2: int,
-                                     truncation_psi: float, styleDrop: str, style_interp: float) -> np.ndarray:
+    def set_model_and_generate_styles(self, device: str, model_name: str, seed1: int, seed2: int, seed3: int,
+                                     truncation_psi: float, styleDrop: str, styleDrop2: str, style_interp: float, style_interp2: float) -> np.ndarray:
         self.set_device(device)
         self.set_model(model_name)
         im1 = self.generate_image(seed1, truncation_psi)
         im2 = self.generate_image(seed2, truncation_psi)
+        im3 = self.generate_image(seed3, truncation_psi)
         w_avg = self.G.mapping.w_avg
         w_list = []
 
@@ -126,6 +127,11 @@ class Model:
         w = w_avg + (w - w_avg) * truncation_psi
         w_list.append(w)
 
+        z = self.random_z_dim(seed3)
+        w = self.G.mapping(torch.from_numpy(z).to(self.device), None)
+        w = w_avg + (w - w_avg) * truncation_psi
+        w_list.append(w)
+
 
         if styleDrop == "total":
             i = style_interp / 2.0  # scaled between 0 and 1
@@ -133,7 +139,7 @@ class Model:
         else:
             i = style_interp # * 2.0 # input should be btwn 0 and 1, then we multiply by 2 to fit these calculations
             if i > 1.0: # mirror across middle
-                w_list = w_list[::-1] # effectively swap the two seeds
+                w_list[0], w_list[1] = w_list[1], w_list[0] # effectively swap the two seeds
                 i = 2.0 - i
             w_base = w_list[0].clone()
             if styleDrop == "fine":
@@ -141,12 +147,27 @@ class Model:
             elif styleDrop == "coarse":
                 w_base[:,:7,:] = xfade(w_base[:,:7,:], w_list[1][:,:7,:], i)
 
+        if seed3 != 0:
+            if styleDrop2 == "total":
+                i = style_interp2 / 2.0  # scaled between 0 and 1
+                w_base = xfade(w_base, w_list[2], i)
+            else:
+                i = style_interp2 # * 2.0 # input should be btwn 0 and 1, then we multiply by 2 to fit these calculations
+                if i > 1.0: # mirror across middle
+                    w_base, w_list[2] = w_list[2], w_base # effectively swap the two seeds
+                    i = 2.0 - i
+                if styleDrop2 == "fine":
+                    w_base[:,8:,:] = xfade(w_base[:,8:,:], w_list[2][:,8:,:], i)
+                elif styleDrop2 == "coarse":
+                    w_base[:,:7,:] = xfade(w_base[:,:7,:], w_list[2][:,:7,:], i)
+
         # print(f"mixing w/ style: {styleDrop}, i: {i}")
      
-        im3 = self.w_to_img(w_base)[0]
+        im4 = self.w_to_img(w_base)[0]
         
         seed1txt =  'Seed 1: ' + str(seed1)
         seed2txt =  'Seed 2: ' + str(seed2)
+        seed3txt =  'Seed 3: ' + str(seed3)
 
-        return im1, im2, im3, seed1txt, seed2txt
+        return im1, im2, im3, im4, seed1txt, seed2txt, seed3txt
         
