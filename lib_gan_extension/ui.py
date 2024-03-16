@@ -61,7 +61,7 @@ def on_ui_tabs():
 
                             seed_recycleButton = ToolButton(ui.reuse_symbol, tooltip="Reuse seed from last generation")
 
-                        simple_runButton = gr.Button('Generate Simple Image', variant="primary", id="simple_generate")
+                        simple_runButton = gr.Button('Generate Simple Image', variant="primary", elem_id="simple_generate")
 
                     with gr.Column():
                         resultImg = gr.Image(label='Result', sources=['upload','clipboard'], interactive=True, type="filepath", elem_classes="gan-output")
