@@ -104,26 +104,12 @@ def on_ui_tabs():
                                 label='Truncation (psi)')  
                 with gr.Row():
                     mix_maskDrop = gr.Dropdown(
-                        choices=[ "total (0xFFFF)", "coarse (0xFF00)", "mid (0x0FF0)", "fine (0x00FF)", "alt1 (0xF0F0)", "alt2 (0x0F0F)", "alt3 (0xF00F)"], label="Interpolation Mask", value="total (0xFFFF)"
+                        choices=[ "total (0xFFFF)", "coarse (0xFF00)", "mid (0x0FF0)", "fine (0x00FF)", "alt1 (0xF0F0)", "alt2 (0x0F0F)", "alt3 (0xF00F)"], label="Interpolation Mask", value=lambda:"total (0xFFFF)"
                     )
-                    mix_mixSlider = gr.Slider(0,1,
-                                    step=0.01,
-                                    value=0.5,
-                                    label='Seed Mix (Crossfade)')
+                    mix_mixSlider = gr.Slider() # this is instantly overwritten by mix_maskDrop.value=lambda:"total (0xFFFF)" -> mix_maskDrop.change(max_mix_slider)
 
-                    def update_mix_range(mask=str, mix_value=float):
-                        if "total" in mask:
-                            # clamp mix_value
-                            if mix_value > 1.0:
-                                mix_value = 1.0
-                            elif mix_value < -1.0:
-                                mix_value = -1.0
-                            # rescale to 0-1
-                            mix_value = GanGenerator.jmap(mix_value, -1.0, 1.0, 0, 1.0)
-                            mix_mixSlider.update(minimum=0, maximum=1, value=mix_value)
-                        else:
-                            mix_mixSlider.update(minimum=1.5, maximum=1.5, value=mix_value)
-                    mix_maskDrop.change(update_mix_range, inputs=[mix_maskDrop, mix_mixSlider], outputs=[], show_progress=False)
+                    mix_maskDrop.change(fn=make_mix_slider, inputs=[mix_maskDrop, mix_mixSlider], outputs=[mix_mixSlider], show_progress=False)
+
 
                     mix_runButton = gr.Button('Generate Style Mix', variant="primary")
 
@@ -265,3 +251,19 @@ def get_mix_params_from_image(img) -> tuple[int,int,float,str]:
     model_name = p.get('model',model_name)
 
     return seed1, seed2, mix, mask #, model_name
+
+def make_mix_slider(mask: str="total (0xFFFF)", mix: float=0) -> gr.Slider:
+    logger(f"mask: {mask}, mix: {mix}")
+    if "total" in mask:
+        # clamp value
+        if mix > 1.0:
+            mix = 1.0
+        elif mix < -1.0:
+            mix = -1.0
+        # rescale to from bipolar to unipolar
+        mix = GanGenerator.jmap(mix, -1.0, 1.0, 0, 1.0)
+        min,max = 0, 1
+    else:
+        min,max = -1.5, 1.5
+    logger(f"mix slider = value: {mix}, min: {min}, max: {max}")
+    return gr.Slider(minimum=min,maximum=max,step=0.01,value=mix,label='Seed Mix (Crossfade)')
